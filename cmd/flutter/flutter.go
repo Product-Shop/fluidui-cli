@@ -110,16 +110,6 @@ class %vVM {
 	check(err1)
 	err2 := os.WriteFile(cubitFile, cubit, 0644)
 	check(err2)
-
-	// f, err := os.Create(cubit)
-	// check(err)
-	// defer f.Close()
-
-	// n, err := f.WriteString(`
-	// 	Screen....
-	// `)
-	// check(err)
-	// fmt.Printf("wrote %d bytes\n", n)
 }
 
 func createCubitFile(sceenName string) {
@@ -138,11 +128,48 @@ func createCubitFile(sceenName string) {
 
 func flutterCLI(command string, args string) {
 	cmd := exec.Command("flutter", command, args)
-	b, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("Flutter function failed: %v", err)
+	switch command {
+	case "create":
+		b, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Flutter function failed: %v", err)
+		}
+		fmt.Printf("%s\n", b)
+		updatePubspec()
+	case "--version":
+		b, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Flutter function failed: %v", err)
+		}
+		fmt.Printf("%s\n", b)
 	}
-	fmt.Printf("%s\n", b)
+}
+
+func updatePubspec() {
+	fileDestination := fmt.Sprintf("%s/pubspec.yaml", projectName)
+	input, err := os.ReadFile(fileDestination)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	lines := strings.Split(string(input), "\n")
+
+	for i, line := range lines {
+		if strings.Contains(line, "cupertino_icons: ^") {
+			lines[i+1] = `	flutter_bloc: ^8.1.3
+	shared_preferences: ^2.2.2
+	supabase_flutter: ^1.10.22
+	email_validator: ^2.1.17
+	timeago: ^3.5.0
+	`
+		}
+	}
+	output := strings.Join(lines, "\n")
+	err = os.WriteFile(fileDestination, []byte(output), 0644)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 }
 
 func check(e error) {
