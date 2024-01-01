@@ -137,6 +137,7 @@ func flutterCLI(command string, args string) {
 		fmt.Printf("%s\n", b)
 		updatePubspec()
 		setMainFile()
+		setResourcesDirectory()
 	case "--version":
 		b, err := cmd.CombinedOutput()
 		if err != nil {
@@ -213,6 +214,64 @@ class MyApp extends StatelessWidget {
 }`, projectName, projectName, projectName, projectName)
 	err := os.WriteFile(fileDestination, []byte(mainFileString), 0644)
 	check(err)
+}
+
+func setResourcesDirectory() {
+
+	directory := fmt.Sprintf("%s/lib/resources", projectName)
+	err := os.Mkdir(directory, 0777)
+	check(err)
+	createAppPages(directory)
+	createNavigationRouter(directory)
+}
+
+func createAppPages(directory string) {
+	appPagesData := `class AppPages {
+		static const String SplashScreen = "/";
+		static const String LoginScreen = "/login";
+	}`
+	screenFile := fmt.Sprintf("%s/app_pages.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(appPagesData), os.ModePerm)
+	check(err1)
+}
+
+func createNavigationRouter(directory string) {
+	routeManagerData := fmt.Sprintf(`import 'package:%s/resources/app_pages.dart';
+import 'package:%s/ui/screens/auth/login/login_screen.dart';
+import 'package:%s/ui/screens/auth/splash/splash_screen.dart';
+import 'package:flutter/material.dart';
+
+final GlobalKey<NavigatorState> navigationKey = GlobalKey<NavigatorState>();
+
+class RouteGenerator {
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    // final args = settings.arguments;
+    switch(settings.name) {
+      case AppPages.SplashScreen:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+      case AppPages.LoginScreen:
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+      default:
+        return _errorRoute();
+    }
+  }
+
+  static Route<dynamic> _errorRoute() {
+    return MaterialPageRoute(builder: (_) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Erorr')
+        ),
+        body: const Center(
+          child: Text('ERROR')
+        ),
+      );
+    });
+  }
+}`, projectName, projectName, projectName)
+	screenFile := fmt.Sprintf("%s/route_generator.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(routeManagerData), os.ModePerm)
+	check(err1)
 }
 
 func check(e error) {
