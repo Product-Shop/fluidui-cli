@@ -63,6 +63,16 @@ func createScreenFile(screenName string, destination string) {
 		check(err)
 	}
 
+	var screenFile string = ""
+	var cubitFile string = ""
+	if destination != "" {
+		screenFile = fmt.Sprintf("%s%s_screen.dart", destination, screenNameLower)
+		cubitFile = fmt.Sprintf("%s%s_cubit.dart", destination, screenNameLower)
+	} else {
+		screenFile = fmt.Sprintf("%s/%s_screen.dart", screenNameLower, screenNameLower)
+		cubitFile = fmt.Sprintf("%s/%s_cubit.dart", screenNameLower, screenNameLower)
+	}
+
 	screenData := fmt.Sprintf(`
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -75,7 +85,7 @@ class %vScreen extends StatelessWidget {
 		return BlocBuilder<%vCubit, %vVM>(
 			builder: (context, state) {
 				final cubit = context.read<%vCubit>();
-				return Scaffold(
+				return const Scaffold(
 					body: Center(
 						child: Text("%v")
 					)
@@ -106,15 +116,7 @@ class %vVM {
 
 	screen := []byte(screenData)
 	cubit := []byte(cubitData)
-	var screenFile string = ""
-	var cubitFile string = ""
-	if destination != "" {
-		screenFile = fmt.Sprintf("%s%s_screen.dart", destination, screenNameLower)
-		cubitFile = fmt.Sprintf("%s%s_cubit.dart", destination, screenNameLower)
-	} else {
-		screenFile = fmt.Sprintf("%s/%s_screen.dart", screenNameLower, screenNameLower)
-		cubitFile = fmt.Sprintf("%s/%s_cubit.dart", screenNameLower, screenNameLower)
-	}
+
 	err1 := os.WriteFile(screenFile, screen, 0644)
 	check(err1)
 	err2 := os.WriteFile(cubitFile, cubit, 0644)
@@ -148,6 +150,7 @@ func flutterCLI(command string, args string) {
 		setMainFile()
 		setResourcesDirectory()
 		setUI()
+		flutterCLI("pub", "get")
 	case "--version":
 		b, err := cmd.CombinedOutput()
 		if err != nil {
@@ -168,12 +171,12 @@ func updatePubspec() {
 
 	for i, line := range lines {
 		if strings.Contains(line, "cupertino_icons: ^") {
-			lines[i+1] = `	flutter_bloc: ^8.1.3
-	shared_preferences: ^2.2.2
-	supabase_flutter: ^1.10.22
-	email_validator: ^2.1.17
-	timeago: ^3.5.0
-	`
+			lines[i+1] = `
+  flutter_bloc: ^8.1.3
+  shared_preferences: ^2.2.2
+  supabase_flutter: ^1.10.22
+  email_validator: ^2.1.17
+  timeago: ^3.5.0`
 		}
 	}
 	output := strings.Join(lines, "\n")
@@ -350,17 +353,20 @@ ThemeData darkTheme = ThemeData(
 }
 
 func setInitialScreens() {
-	authDirectory := fmt.Sprintf("%s/lib/ui/auth/", projectName)
+	screensDirectory := fmt.Sprintf("%s/lib/ui/screens/", projectName)
+	authDirectory := fmt.Sprintf("%sauth/", screensDirectory)
 	loginDirectory := fmt.Sprintf("%slogin/", authDirectory)
 	splashDirctory := fmt.Sprintf("%ssplash/", authDirectory)
-	err := os.Mkdir(authDirectory, 0777)
+	err := os.Mkdir(screensDirectory, 0777)
 	check(err)
-	err1 := os.Mkdir(loginDirectory, 0777)
+	err1 := os.Mkdir(authDirectory, 0777)
 	check(err1)
-	createScreenFile("login", loginDirectory)
-	err2 := os.Mkdir(splashDirctory, 0777)
+	err2 := os.Mkdir(loginDirectory, 0777)
 	check(err2)
-	createScreenFile("splash", splashDirctory)
+	createScreenFile("Login", loginDirectory)
+	err3 := os.Mkdir(splashDirctory, 0777)
+	check(err3)
+	createScreenFile("Splash", splashDirctory)
 }
 
 func check(e error) {
