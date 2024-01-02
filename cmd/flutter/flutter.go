@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
+Copyright © 2023 Morgan Winbush <morgan@ynotlabsllc.com>
 */
 package flutter
 
@@ -138,6 +138,7 @@ func flutterCLI(command string, args string) {
 		updatePubspec()
 		setMainFile()
 		setResourcesDirectory()
+		setThemes()
 	case "--version":
 		b, err := cmd.CombinedOutput()
 		if err != nil {
@@ -217,7 +218,6 @@ class MyApp extends StatelessWidget {
 }
 
 func setResourcesDirectory() {
-
 	directory := fmt.Sprintf("%s/lib/resources", projectName)
 	err := os.Mkdir(directory, 0777)
 	check(err)
@@ -271,6 +271,64 @@ class RouteGenerator {
 }`, projectName, projectName, projectName)
 	screenFile := fmt.Sprintf("%s/route_generator.dart", directory)
 	err1 := os.WriteFile(screenFile, []byte(routeManagerData), os.ModePerm)
+	check(err1)
+}
+
+func setThemes() {
+	directory := fmt.Sprintf("%s/lib/themes", projectName)
+	err := os.Mkdir(directory, 0777)
+	check(err)
+	createLightMode(directory)
+	createDarkMode(directory)
+}
+
+func createLightMode(directory string) {
+	themeData := `import 'package:flutter/material.dart';
+
+ThemeData lightTheme = ThemeData(
+	brightness: Brightness.light,
+	appBarTheme: const AppBarTheme(
+	backgroundColor: Colors.white,
+	foregroundColor: Colors.black,
+	iconTheme: IconThemeData(
+		color: Colors.black
+	)
+	),
+	bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+	backgroundColor: Colors.white,
+	enableFeedback: false,
+	type: BottomNavigationBarType.fixed,
+	selectedItemColor: Colors.black,
+	unselectedItemColor: Colors.grey
+	),
+);`
+	screenFile := fmt.Sprintf("%s/light_theme.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(themeData), os.ModePerm)
+	check(err1)
+}
+
+func createDarkMode(directory string) {
+	themeData := `import 'package:flutter/material.dart';
+
+ThemeData darkTheme = ThemeData(
+	brightness: Brightness.dark,
+	appBarTheme: AppBarTheme(
+	backgroundColor: Colors.grey[900],
+	foregroundColor: Colors.grey[200],
+	iconTheme: IconThemeData(
+		color: Colors.grey[200],
+	)
+	),
+	bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+	backgroundColor: Colors.black,
+	enableFeedback: false,
+	type: BottomNavigationBarType.fixed,
+	selectedItemColor: Colors.grey,
+	unselectedItemColor: Colors.white
+	),
+);`
+	screenFile := fmt.Sprintf("%s/dark_theme.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(themeData), os.ModePerm)
 	check(err1)
 }
 
