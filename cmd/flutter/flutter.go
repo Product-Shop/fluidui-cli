@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
+Copyright © 2023 Morgan Winbush <morgan@ynotlabsllc.com>
 */
 package flutter
 
@@ -50,16 +50,28 @@ var createScreen = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Command value name: %v \n", screenName)
 
-		createScreenFile(screenName)
+		createScreenFile(screenName, "")
 		// createCubitFile(screenName)
 	},
 }
 
-func createScreenFile(screenName string) {
+func createScreenFile(screenName string, destination string) {
 	screenNameLower := strings.ToLower(screenName)
-	cmd := exec.Command("mkdir", screenNameLower)
-	_, err := cmd.CombinedOutput()
-	check(err)
+	if destination == "" {
+		cmd := exec.Command("mkdir", screenNameLower)
+		_, err := cmd.CombinedOutput()
+		check(err)
+	}
+
+	var screenFile string = ""
+	var cubitFile string = ""
+	if destination != "" {
+		screenFile = fmt.Sprintf("%s%s_screen.dart", destination, screenNameLower)
+		cubitFile = fmt.Sprintf("%s%s_cubit.dart", destination, screenNameLower)
+	} else {
+		screenFile = fmt.Sprintf("%s/%s_screen.dart", screenNameLower, screenNameLower)
+		cubitFile = fmt.Sprintf("%s/%s_cubit.dart", screenNameLower, screenNameLower)
+	}
 
 	screenData := fmt.Sprintf(`
 import 'package:flutter/material.dart';
@@ -73,7 +85,7 @@ class %vScreen extends StatelessWidget {
 		return BlocBuilder<%vCubit, %vVM>(
 			builder: (context, state) {
 				final cubit = context.read<%vCubit>();
-				return Scaffold(
+				return const Scaffold(
 					body: Center(
 						child: Text("%v")
 					)
@@ -104,22 +116,11 @@ class %vVM {
 
 	screen := []byte(screenData)
 	cubit := []byte(cubitData)
-	screenFile := fmt.Sprintf("%s/%s_screen.dart", screenNameLower, screenNameLower)
-	cubitFile := fmt.Sprintf("%s/%s_cubit.dart", screenNameLower, screenNameLower)
+
 	err1 := os.WriteFile(screenFile, screen, 0644)
 	check(err1)
 	err2 := os.WriteFile(cubitFile, cubit, 0644)
 	check(err2)
-
-	// f, err := os.Create(cubit)
-	// check(err)
-	// defer f.Close()
-
-	// n, err := f.WriteString(`
-	// 	Screen....
-	// `)
-	// check(err)
-	// fmt.Printf("wrote %d bytes\n", n)
 }
 
 func createCubitFile(sceenName string) {
@@ -138,11 +139,234 @@ func createCubitFile(sceenName string) {
 
 func flutterCLI(command string, args string) {
 	cmd := exec.Command("flutter", command, args)
-	b, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("Flutter function failed: %v", err)
+	switch command {
+	case "create":
+		b, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Flutter function failed: %v", err)
+		}
+		fmt.Printf("%s\n", b)
+		updatePubspec()
+		setMainFile()
+		setResourcesDirectory()
+		setUI()
+		flutterCLI("pub", "get")
+	case "--version":
+		b, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Flutter function failed: %v", err)
+		}
+		fmt.Printf("%s\n", b)
 	}
-	fmt.Printf("%s\n", b)
+}
+
+func updatePubspec() {
+	fileDestination := fmt.Sprintf("%s/pubspec.yaml", projectName)
+	input, err := os.ReadFile(fileDestination)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	lines := strings.Split(string(input), "\n")
+
+	for i, line := range lines {
+		if strings.Contains(line, "cupertino_icons: ^") {
+			lines[i+1] = `
+  flutter_bloc: ^8.1.3
+  shared_preferences: ^2.2.2
+  supabase_flutter: ^1.10.22
+  email_validator: ^2.1.17
+  timeago: ^3.5.0`
+		}
+	}
+	output := strings.Join(lines, "\n")
+	err = os.WriteFile(fileDestination, []byte(output), 0644)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+}
+
+func setMainFile() {
+	fileDestination := fmt.Sprintf("%s/lib/main.dart", projectName)
+
+	mainFileString := fmt.Sprintf(`import 'package:%s/resources/app_pages.dart';
+import 'package:%s/resources/route_generator.dart';
+import 'package:%s/ui/themes/dark_theme.dart';
+import 'package:%s/ui/themes/light_theme.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: "",
+    anonKey: ""
+  );
+   
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter Demo',
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      initialRoute: AppPages.SplashScreen,
+      navigatorKey: navigationKey,
+      onGenerateRoute: RouteGenerator.generateRoute,
+    );
+  }
+}`, projectName, projectName, projectName, projectName)
+	err := os.WriteFile(fileDestination, []byte(mainFileString), 0644)
+	check(err)
+}
+
+func setResourcesDirectory() {
+	directory := fmt.Sprintf("%s/lib/resources", projectName)
+	err := os.Mkdir(directory, 0777)
+	check(err)
+	createAppPages(directory)
+	createNavigationRouter(directory)
+}
+
+func createAppPages(directory string) {
+	appPagesData := `class AppPages {
+		static const String SplashScreen = "/";
+		static const String LoginScreen = "/login";
+	}`
+	screenFile := fmt.Sprintf("%s/app_pages.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(appPagesData), os.ModePerm)
+	check(err1)
+}
+
+func createNavigationRouter(directory string) {
+	routeManagerData := fmt.Sprintf(`import 'package:%s/resources/app_pages.dart';
+import 'package:%s/ui/screens/auth/login/login_screen.dart';
+import 'package:%s/ui/screens/auth/splash/splash_screen.dart';
+import 'package:flutter/material.dart';
+
+final GlobalKey<NavigatorState> navigationKey = GlobalKey<NavigatorState>();
+
+class RouteGenerator {
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    // final args = settings.arguments;
+    switch(settings.name) {
+      case AppPages.SplashScreen:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+      case AppPages.LoginScreen:
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+      default:
+        return _errorRoute();
+    }
+  }
+
+  static Route<dynamic> _errorRoute() {
+    return MaterialPageRoute(builder: (_) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Erorr')
+        ),
+        body: const Center(
+          child: Text('ERROR')
+        ),
+      );
+    });
+  }
+}`, projectName, projectName, projectName)
+	screenFile := fmt.Sprintf("%s/route_generator.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(routeManagerData), os.ModePerm)
+	check(err1)
+}
+
+func setUI() {
+	directory := fmt.Sprintf("%s/lib/ui", projectName)
+	err := os.Mkdir(directory, 0777)
+	check(err)
+	setThemes()
+	setInitialScreens()
+}
+
+func setThemes() {
+	directory := fmt.Sprintf("%s/lib/ui/themes", projectName)
+	err := os.Mkdir(directory, 0777)
+	check(err)
+	createLightMode(directory)
+	createDarkMode(directory)
+}
+
+func createLightMode(directory string) {
+	themeData := `import 'package:flutter/material.dart';
+
+ThemeData lightTheme = ThemeData(
+	brightness: Brightness.light,
+	appBarTheme: const AppBarTheme(
+	backgroundColor: Colors.white,
+	foregroundColor: Colors.black,
+	iconTheme: IconThemeData(
+		color: Colors.black
+	)
+	),
+	bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+	backgroundColor: Colors.white,
+	enableFeedback: false,
+	type: BottomNavigationBarType.fixed,
+	selectedItemColor: Colors.black,
+	unselectedItemColor: Colors.grey
+	),
+);`
+	screenFile := fmt.Sprintf("%s/light_theme.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(themeData), os.ModePerm)
+	check(err1)
+}
+
+func createDarkMode(directory string) {
+	themeData := `import 'package:flutter/material.dart';
+
+ThemeData darkTheme = ThemeData(
+	brightness: Brightness.dark,
+	appBarTheme: AppBarTheme(
+	backgroundColor: Colors.grey[900],
+	foregroundColor: Colors.grey[200],
+	iconTheme: IconThemeData(
+		color: Colors.grey[200],
+	)
+	),
+	bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+	backgroundColor: Colors.black,
+	enableFeedback: false,
+	type: BottomNavigationBarType.fixed,
+	selectedItemColor: Colors.grey,
+	unselectedItemColor: Colors.white
+	),
+);`
+	screenFile := fmt.Sprintf("%s/dark_theme.dart", directory)
+	err1 := os.WriteFile(screenFile, []byte(themeData), os.ModePerm)
+	check(err1)
+}
+
+func setInitialScreens() {
+	screensDirectory := fmt.Sprintf("%s/lib/ui/screens/", projectName)
+	authDirectory := fmt.Sprintf("%sauth/", screensDirectory)
+	loginDirectory := fmt.Sprintf("%slogin/", authDirectory)
+	splashDirctory := fmt.Sprintf("%ssplash/", authDirectory)
+	err := os.Mkdir(screensDirectory, 0777)
+	check(err)
+	err1 := os.Mkdir(authDirectory, 0777)
+	check(err1)
+	err2 := os.Mkdir(loginDirectory, 0777)
+	check(err2)
+	createScreenFile("Login", loginDirectory)
+	err3 := os.Mkdir(splashDirctory, 0777)
+	check(err3)
+	createScreenFile("Splash", splashDirctory)
 }
 
 func check(e error) {
