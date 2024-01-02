@@ -50,16 +50,18 @@ var createScreen = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Command value name: %v \n", screenName)
 
-		createScreenFile(screenName)
+		createScreenFile(screenName, "")
 		// createCubitFile(screenName)
 	},
 }
 
-func createScreenFile(screenName string) {
+func createScreenFile(screenName string, destination string) {
 	screenNameLower := strings.ToLower(screenName)
-	cmd := exec.Command("mkdir", screenNameLower)
-	_, err := cmd.CombinedOutput()
-	check(err)
+	if destination == "" {
+		cmd := exec.Command("mkdir", screenNameLower)
+		_, err := cmd.CombinedOutput()
+		check(err)
+	}
 
 	screenData := fmt.Sprintf(`
 import 'package:flutter/material.dart';
@@ -104,8 +106,15 @@ class %vVM {
 
 	screen := []byte(screenData)
 	cubit := []byte(cubitData)
-	screenFile := fmt.Sprintf("%s/%s_screen.dart", screenNameLower, screenNameLower)
-	cubitFile := fmt.Sprintf("%s/%s_cubit.dart", screenNameLower, screenNameLower)
+	var screenFile string = ""
+	var cubitFile string = ""
+	if destination != "" {
+		screenFile = fmt.Sprintf("%s%s_screen.dart", destination, screenNameLower)
+		cubitFile = fmt.Sprintf("%s%s_cubit.dart", destination, screenNameLower)
+	} else {
+		screenFile = fmt.Sprintf("%s/%s_screen.dart", screenNameLower, screenNameLower)
+		cubitFile = fmt.Sprintf("%s/%s_cubit.dart", screenNameLower, screenNameLower)
+	}
 	err1 := os.WriteFile(screenFile, screen, 0644)
 	check(err1)
 	err2 := os.WriteFile(cubitFile, cubit, 0644)
@@ -138,7 +147,7 @@ func flutterCLI(command string, args string) {
 		updatePubspec()
 		setMainFile()
 		setResourcesDirectory()
-		setThemes()
+		setUI()
 	case "--version":
 		b, err := cmd.CombinedOutput()
 		if err != nil {
@@ -274,8 +283,16 @@ class RouteGenerator {
 	check(err1)
 }
 
+func setUI() {
+	directory := fmt.Sprintf("%s/lib/ui", projectName)
+	err := os.Mkdir(directory, 0777)
+	check(err)
+	setThemes()
+	setInitialScreens()
+}
+
 func setThemes() {
-	directory := fmt.Sprintf("%s/lib/themes", projectName)
+	directory := fmt.Sprintf("%s/lib/ui/themes", projectName)
 	err := os.Mkdir(directory, 0777)
 	check(err)
 	createLightMode(directory)
@@ -330,6 +347,20 @@ ThemeData darkTheme = ThemeData(
 	screenFile := fmt.Sprintf("%s/dark_theme.dart", directory)
 	err1 := os.WriteFile(screenFile, []byte(themeData), os.ModePerm)
 	check(err1)
+}
+
+func setInitialScreens() {
+	authDirectory := fmt.Sprintf("%s/lib/ui/auth/", projectName)
+	loginDirectory := fmt.Sprintf("%slogin/", authDirectory)
+	splashDirctory := fmt.Sprintf("%ssplash/", authDirectory)
+	err := os.Mkdir(authDirectory, 0777)
+	check(err)
+	err1 := os.Mkdir(loginDirectory, 0777)
+	check(err1)
+	createScreenFile("login", loginDirectory)
+	err2 := os.Mkdir(splashDirctory, 0777)
+	check(err2)
+	createScreenFile("splash", splashDirctory)
 }
 
 func check(e error) {
