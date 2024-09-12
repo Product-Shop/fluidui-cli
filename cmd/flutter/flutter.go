@@ -13,11 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	projectName string
-	screenName  string
-)
-
 // flutterCmd represents the flutter command
 var FlutterCmd = &cobra.Command{
 	Use:   "flutter",
@@ -30,16 +25,18 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of Hugo",
 	Long:  `All software has versions. This is Hugo's`,
 	Run: func(cmd *cobra.Command, args []string) {
-		flutterCLI("--version", "")
+		flutterCLI("--version", "1.0.1")
 	},
 }
 
 var createCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Print the version number of Hugo",
-	Long:  `All software has versions. This is Hugo's`,
+	Short: "Create a new Flutter Project",
+	Long:  `Create is for generating a new Flutter project with all Product Shop templated items`,
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		flutterCLI("create", projectName)
+		fmt.Printf("Generateing new Flutter Project: %v \n", args[0])
+		flutterCLI("create", args[0])
 	},
 }
 
@@ -47,11 +44,11 @@ var createScreen = &cobra.Command{
 	Use:   "screen",
 	Short: "Create A New Screen Component",
 	Long:  `This creates a new flutter bloc module`,
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Command value name: %v \n", screenName)
+		fmt.Printf("Generateing new Flutter Screen Components for: %v \n", args[0])
 
-		createScreenFile(screenName, "")
-		// createCubitFile(screenName)
+		createScreenFile(args[0], "")
 	},
 }
 
@@ -108,9 +105,9 @@ class %vCubit extends Cubit<%vVM> {
 }
 
 class %vVM {
-	%vVM.init()
+	%vVM.init();
 
-	%vVM({})
+	%vVM();
 }
 	`, screenName, screenName, screenName, screenName, screenName, screenName, screenName)
 
@@ -146,10 +143,10 @@ func flutterCLI(command string, args string) {
 			log.Printf("Flutter function failed: %v", err)
 		}
 		fmt.Printf("%s\n", b)
-		updatePubspec()
-		setMainFile()
-		setResourcesDirectory()
-		setUI()
+		updatePubspec(args)
+		setMainFile(args)
+		setResourcesDirectory(args)
+		setUI(args)
 		flutterCLI("pub", "get")
 	case "--version":
 		b, err := cmd.CombinedOutput()
@@ -160,7 +157,7 @@ func flutterCLI(command string, args string) {
 	}
 }
 
-func updatePubspec() {
+func updatePubspec(projectName string) {
 	fileDestination := fmt.Sprintf("%s/pubspec.yaml", projectName)
 	input, err := os.ReadFile(fileDestination)
 	if err != nil {
@@ -176,7 +173,11 @@ func updatePubspec() {
   shared_preferences: ^2.2.2
   supabase_flutter: ^1.10.22
   email_validator: ^2.1.17
-  timeago: ^3.5.0`
+  timeago: ^3.5.0
+  product_shop_ui:
+    git:
+      url: git@github.com:mw-productshop/fluid-ui.git
+      ref: main # branch name`
 		}
 	}
 	output := strings.Join(lines, "\n")
@@ -187,7 +188,7 @@ func updatePubspec() {
 
 }
 
-func setMainFile() {
+func setMainFile(projectName string) {
 	fileDestination := fmt.Sprintf("%s/lib/main.dart", projectName)
 
 	mainFileString := fmt.Sprintf(`import 'package:%s/resources/app_pages.dart';
@@ -229,12 +230,12 @@ class MyApp extends StatelessWidget {
 	check(err)
 }
 
-func setResourcesDirectory() {
+func setResourcesDirectory(projectName string) {
 	directory := fmt.Sprintf("%s/lib/resources", projectName)
 	err := os.Mkdir(directory, 0777)
 	check(err)
 	createAppPages(directory)
-	createNavigationRouter(directory)
+	createNavigationRouter(directory, projectName)
 }
 
 func createAppPages(directory string) {
@@ -247,7 +248,7 @@ func createAppPages(directory string) {
 	check(err1)
 }
 
-func createNavigationRouter(directory string) {
+func createNavigationRouter(directory string, projectName string) {
 	routeManagerData := fmt.Sprintf(`import 'package:%s/resources/app_pages.dart';
 import 'package:%s/ui/screens/auth/login/login_screen.dart';
 import 'package:%s/ui/screens/auth/splash/splash_screen.dart';
@@ -286,15 +287,15 @@ class RouteGenerator {
 	check(err1)
 }
 
-func setUI() {
+func setUI(projectName string) {
 	directory := fmt.Sprintf("%s/lib/ui", projectName)
 	err := os.Mkdir(directory, 0777)
 	check(err)
-	setThemes()
-	setInitialScreens()
+	setThemes(projectName)
+	setInitialScreens(projectName)
 }
 
-func setThemes() {
+func setThemes(projectName string) {
 	directory := fmt.Sprintf("%s/lib/ui/themes", projectName)
 	err := os.Mkdir(directory, 0777)
 	check(err)
@@ -352,7 +353,7 @@ ThemeData darkTheme = ThemeData(
 	check(err1)
 }
 
-func setInitialScreens() {
+func setInitialScreens(projectName string) {
 	screensDirectory := fmt.Sprintf("%s/lib/ui/screens/", projectName)
 	authDirectory := fmt.Sprintf("%sauth/", screensDirectory)
 	loginDirectory := fmt.Sprintf("%slogin/", authDirectory)
@@ -382,13 +383,6 @@ func init() {
 	FlutterCmd.AddCommand(versionCmd)
 	FlutterCmd.AddCommand(createCmd)
 	FlutterCmd.AddCommand(createScreen)
-
-	createCmd.Flags().StringVarP(&projectName, "name", "n", "", "The name of the project")
-	createScreen.Flags().StringVarP(&screenName, "screen", "s", "", "The screen name")
-
-	if err := createCmd.MarkFlagRequired("name"); err != nil {
-		fmt.Println(err)
-	}
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
