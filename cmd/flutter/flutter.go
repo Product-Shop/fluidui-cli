@@ -79,19 +79,22 @@ class %vScreen extends StatelessWidget {
 
 	@override
 	Widget build(BuildContext context) {
-		return BlocBuilder<%vCubit, %vVM>(
-			builder: (context, state) {
-				final cubit = context.read<%vCubit>();
-				return const Scaffold(
-					body: Center(
-						child: Text("%v")
-					)
-				);
-			}
-		);
+		return BlocProvider(
+		    create: (context) => %vCubit(),
+		    child: BlocBuilder<%vCubit, %vVM>(
+			    builder: (context, state) {
+				    final cubit = context.read<%vCubit>();
+				    return const Scaffold(
+					    body: Center(
+						    child: Text("%v")
+					    )
+				    );
+			    }
+            )
+        );
 	}
 }
-	`, screenName, screenName, screenName, screenName, screenName, screenName)
+	`, screenName, screenName, screenName, screenName, screenName, screenName, screenName)
 
 	cubitData := fmt.Sprintf(`
 import 'package:flutter_bloc/flutter_bloc.dart';
